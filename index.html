@@ -27,10 +27,10 @@
     </div>
     <div class="row">
       <label>Phone <input type="text" name="phone" required></label>
-      <label>Unit number(s) <input type="text" name="unitNumbers" required></label>
+      <label>Unit number(s) <input type="text" name="unitNumbers" id="unitNumber" required></label>
     </div>
     <div class="row">
-      <label>Unit price <input type="number" name="unitPrice" min="0" required></label>
+      <label>Unit price <input type="number" name="unitPrice" id="unitPrice" min="0" required></label>
     </div>
     <div class="row">
       <label>Chosen plan
@@ -104,6 +104,20 @@
       return errors;
     }
 
+    // *** NEW FUNCTION TO PRE-FILL THE FORM ***
+    function prefillFormFromUrl() {
+        const queryParams = new URLSearchParams(window.location.search);
+        const unitNum = queryParams.get('unitNumber');
+        const unitPr = queryParams.get('unitPrice');
+
+        if (unitNum) {
+            form.unitNumbers.value = unitNum;
+        }
+        if (unitPr) {
+            form.unitPrice.value = unitPr;
+        }
+    }
+
     // Event listeners for calculation and validation
     form.unitPrice.addEventListener('input', () => { calculateTotal(); validateForm(); });
     form.plan.addEventListener('change', () => { calculateTotal(); validateForm(); });
@@ -114,8 +128,9 @@
     form.passport.addEventListener('change', validateForm);
     form.receipt.addEventListener('change', validateForm);
 
-    // Initial validation
+    // Initial page load setup
     window.addEventListener('DOMContentLoaded', () => {
+      prefillFormFromUrl(); // *** CALL THE NEW FUNCTION HERE ***
       calculateTotal();
       validateForm();
     });
