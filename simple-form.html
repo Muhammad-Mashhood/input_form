@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Form</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; background: #f7f7f7; }
+    form { max-width: 600px; margin: auto; background: #fff; padding: 30px 30px 20px 30px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .row { display: flex; gap: 20px; }
+    .row > label { flex: 1; }
+    label { display: block; margin-top: 15px; font-weight: 500; }
+    input, select { width: 100%; padding: 8px; margin-top: 5px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
+    input[type="file"] { padding: 3px; }
+    button { margin-top: 20px; padding: 12px 24px; background: #0078d4; color: #fff; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; transition: background 0.2s; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+    .error { color: #d8000c; font-size: 13px; margin-top: 3px; }
+    .success { color: #007800; font-size: 15px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Basic Payment Form</h2>
+  <form id="paymentForm">
+    <div class="row">
+      <label>Name <input type="text" name="name" required></label>
+      <label>Email <input type="email" name="email" required></label>
+    </div>
+    <div class="row">
+      <label>Phone <input type="text" name="phone" required></label>
+      <label>Unit number(s) <input type="text" name="unitNumbers" required></label>
+    </div>
+    <div class="row">
+      <label>Unit price <input type="number" name="unitPrice" min="0" required></label>
+    </div>
+    <div class="row">
+      <label>Chosen plan
+        <select name="plan" required>
+          <option value="2">2%</option>
+          <option value="20">20%</option>
+        </select>
+      </label>
+      <label>Total payment required <input type="number" name="totalPayment" readonly required></label>
+    </div>
+    <div style="margin-top: 5px; font-size: 13px; color: #555;">Note: 4% DLD fee is included in the total.</div>
+    <div class="row">
+      <label>Passport <input type="file" name="passport" accept="image/*,.pdf" required></label>
+      <label>Receipt <input type="file" name="receipt" accept="image/*,.pdf" required></label>
+    </div>
+    <div id="formErrors"></div>
+    <button type="submit" id="submitBtn" disabled>Submit</button>
+  </form>
+  <div id="status"></div>
+  <div id="status"></div>
+  <script>
+    const form = document.getElementById('paymentForm');
+    const statusDiv = document.getElementById('status');
+    const errorsDiv = document.getElementById('formErrors');
+    const submitBtn = document.getElementById('submitBtn');
+    const cloudName = 'duyxw8aet';
+    const uploadPreset = 'skill_trade_uploads';
+    const uploadFolder = 'course_images';
+    const webhookUrl = 'https://mash112233.app.n8n.cloud/webhook-test/77a7696a-4714-4b7a-9c49-8aea1744f3cf';
+
+    // Helper: Validate email
+    function validateEmail(email) {
+      return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+    }
+    // Helper: Validate phone (basic)
+    function validatePhone(phone) {
+      return /^[0-9\-\+\s]{7,15}$/.test(phone);
+    }
+    // Helper: Validate file size
+    function validateFileSize(file) {
+      return file && file.size <= 5 * 1024 * 1024;
+    }
+
+    // Calculate total payment
+    function calculateTotal() {
+      const unitPrice = parseFloat(form.unitPrice.value) || 0;
+      const dldFee = unitPrice * 0.04;
+      const planPercent = parseFloat(form.plan.value) || 0;
+      const planAmount = unitPrice * (planPercent / 100);
+      const total = dldFee + planAmount;
+      form.totalPayment.value = total ? total.toFixed(2) : '';
+    }
+
+    // Validate all fields
+    function validateForm() {
+      let errors = [];
+      if (!form.name.value.trim()) errors.push('Name is required.');
+      if (!validateEmail(form.email.value)) errors.push('Valid email is required.');
+      if (!validatePhone(form.phone.value)) errors.push('Valid phone is required.');
+      if (!form.unitNumbers.value.trim()) errors.push('Unit number(s) required.');
+      if (!form.unitPrice.value || parseFloat(form.unitPrice.value) <= 0) errors.push('Unit price must be positive.');
+      if (!form.plan.value) errors.push('Plan is required.');
+      if (!form.totalPayment.value || parseFloat(form.totalPayment.value) <= 0) errors.push('Total payment must be positive.');
+      // File checks
+      const passportFile = form.passport.files[0];
+      const receiptFile = form.receipt.files[0];
+      if (!passportFile) errors.push('Passport file required.');
+      else if (!validateFileSize(passportFile)) errors.push('Passport file must be ≤ 5MB.');
+      if (!receiptFile) errors.push('Receipt file required.');
+      else if (!validateFileSize(receiptFile)) errors.push('Receipt file must be ≤ 5MB.');
+      submitBtn.disabled = errors.length > 0;
+      return errors;
+    }
+
+    // Event listeners for calculation and validation
+    form.unitPrice.addEventListener('input', () => { calculateTotal(); validateForm(); });
+    form.plan.addEventListener('change', () => { calculateTotal(); validateForm(); });
+    form.name.addEventListener('input', validateForm);
+    form.email.addEventListener('input', validateForm);
+    form.phone.addEventListener('input', validateForm);
+    form.unitNumbers.addEventListener('input', validateForm);
+    form.passport.addEventListener('change', validateForm);
+    form.receipt.addEventListener('change', validateForm);
+
+    // Initial validation
+    window.addEventListener('DOMContentLoaded', () => {
+      calculateTotal();
+      validateForm();
+    });
+
+    // Secure upload to Cloudinary
+    async function uploadToCloudinary(file) {
+      const url = `https://api.cloudinary.com/v1_1/${cloudName}/upload`;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', uploadPreset);
+      formData.append('folder', uploadFolder);
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error('Upload failed: ' + errorText);
+      }
+      return response.json();
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errors = validateForm();
+      if (errors.length) {
+        errorsDiv.innerHTML = '<div class="error">' + errors.join('<br>') + '</div>';
+        return;
+      } else {
+        errorsDiv.innerHTML = '';
+      }
+      statusDiv.textContent = 'Uploading files...';
+      submitBtn.disabled = true;
+      try {
+        // Upload passport
+        const passportFile = form.passport.files[0];
+        const passportRes = await uploadToCloudinary(passportFile);
+        // Upload receipt
+        const receiptFile = form.receipt.files[0];
+        const receiptRes = await uploadToCloudinary(receiptFile);
+        // Prepare payload
+        const payload = {
+          name: form.name.value.trim(),
+          email: form.email.value.trim(),
+          phone: form.phone.value.trim(),
+          unitNumbers: form.unitNumbers.value.trim(),
+          unitPrice: form.unitPrice.value,
+          dldFee: (parseFloat(form.unitPrice.value) * 0.04).toFixed(2),
+          plan: form.plan.value,
+          totalPayment: form.totalPayment.value,
+          passportUrl: passportRes.secure_url,
+          receiptUrl: receiptRes.secure_url
+        };
+        // Send to webhook
+        statusDiv.textContent = 'Sending data...';
+        const webhookRes = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!webhookRes.ok) throw new Error('Webhook failed');
+        statusDiv.innerHTML = '<span class="success">Submitted successfully!</span>';
+        form.reset();
+        calculateTotal();
+        validateForm();
+      } catch (err) {
+        statusDiv.innerHTML = '<span class="error">Error: ' + err.message + '</span>';
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
